@@ -57,7 +57,11 @@ func main() {
 	// fmt.Printf("%#v", allItems)
 	for _, v := range allItems {
 		//               Mon, 4 Apr 2016 00:00:00 -0700
-		d, _ := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
+		d, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "j2j: %v\n", err)
+			os.Exit(1)
+		}
 		// %-67s - pads Summary to 67 chars
 		fmt.Printf("%s\t%v\t%-67s%8.2f\n", v.Key.Val, d.Format("2006-JAN-02"), v.Summary, float64(v.TimeSpent.Seconds)/60/60)
 	}
