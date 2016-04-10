@@ -56,7 +56,7 @@ func main() {
 	}
 	// fmt.Printf("%#v", allItems)
 	for _, v := range allItems {
-		//               Mon, 4 Apr 2016 00:00:00 -0700
+		//                    Mon, 4 Apr 2016 00:00:00 -0700
 		d, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "j2j: %v\n", err)
