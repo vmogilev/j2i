@@ -1,4 +1,4 @@
-// j2j parses JIRA rss feed and creates an Invoice using FreshBooks API.
+// j2i parses JIRA rss feed and creates an Invoice using FreshBooks API.
 package main
 
 import (
@@ -40,7 +40,7 @@ func main() {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			fmt.Fprintf(os.Stderr, "j2j: %v\n", err)
+			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
 			os.Exit(1)
 		}
 		switch tok := tok.(type) {
@@ -59,7 +59,7 @@ func main() {
 		//                    Mon, 4 Apr 2016 00:00:00 -0700
 		d, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "j2j: %v\n", err)
+			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
 			os.Exit(1)
 		}
 		// %-67s - pads Summary to 67 chars
