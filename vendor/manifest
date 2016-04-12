@@ -1,0 +1,11 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/tambet/oauthplain",
+			"repository": "https://github.com/tambet/oauthplain",
+			"revision": "bbbd263fa701555c44a56ed5d9c8e2f360f8c167",
+			"branch": "master"
+		}
+	]
+}
