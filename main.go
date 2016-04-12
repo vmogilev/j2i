@@ -2,68 +2,148 @@
 package main
 
 import (
-	"encoding/xml"
+	"encoding/json"
+	"flag"
 	"fmt"
-	"io"
+	"io/ioutil"
+	"log"
 	"os"
+	"os/user"
+	"path/filepath"
 	"time"
 )
 
-// ItemKey is part of item
-type ItemKey struct {
-	ID  int64  `xml:"id,attr"`
-	Val string `xml:",chardata"`
+var (
+	jiraSearchID = flag.String("jiraSearchID", "", "JIRA Search Filter ID, for example in ?filter=10101, it's 10101")
+	fbProject    = flag.String("fbProject", "", "Fresh Books Project Name")
+	fbTask       = flag.String("fbTask", "", "Fresh Books Task")
+	trace        = flag.Bool("trace", false, "Trace")
+)
+
+type appConfig struct {
+	JiraAccountName    string // JIRA account name (i.e. hashjoin - appended to .atlassian.net XML feed for items)
+	JiraUname          string // JIRA Username (i.e. admin, not email address)
+	JiraPass           string // JIRA password
+	FbAccountName      string
+	FbAuthToken        string // Token-Based authentication (deprecated)
+	FbConsumerKey      string // OAuth authentication
+	FbConsumerSecret   string // OAuth authentication
+	FbOAuthToken       string // OAuth authentication
+	FbOAuthTokenSecret string // OAuth authentication
 }
 
-// ItemTimeSpent is part of item
-type ItemTimeSpent struct {
-	Seconds int64  `xml:"seconds,attr"`
-	Val     string `xml:",chardata"`
+type appContext struct {
+	trace bool
+	cfg   *appConfig
 }
 
-// Item is the top level item
-type Item struct {
-	Key       ItemKey       `xml:"key"`
-	Summary   string        `xml:"summary"`
-	Due       string        `xml:"due"`
-	TimeSpent ItemTimeSpent `xml:"timespent"`
+var c appContext
+
+func loadConfig() *appConfig {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cfgFile := filepath.Join(usr.HomeDir, ".j2i/config.json")
+	file, e := ioutil.ReadFile(cfgFile)
+	if e != nil {
+		fmt.Fprintf(os.Stderr, "Unable to load %s", cfgFile)
+		os.Exit(1)
+	}
+	var config appConfig
+	if err := json.Unmarshal(file, &config); err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to unmarshal %s", cfgFile)
+		os.Exit(1)
+	}
+	return &config
 }
 
-// Items are collection of Item
-type Items []Item
+func (c *appContext) printFB(i interface{}, err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
+		os.Exit(1)
+	}
+	if c.trace {
+		fmt.Printf("%#v\n", i)
+	}
+}
+
+func (c *appContext) helpFB() {
+	fb := NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
+	c.printFB(fb.Clients())
+	c.printFB(fb.Projects())
+	c.printFB(fb.Tasks())
+
+	fmt.Println("--- Clients ---")
+	for _, cl := range fb.clients {
+		fmt.Printf("%s\n", cl.Name)
+		fb.clientProjects(cl.ClientID)
+	}
+	fmt.Println("--- Tasks ---")
+	for _, tk := range fb.tasks {
+		fmt.Printf("\t%s\n", tk.Name)
+	}
+
+}
 
 func main() {
-	var allItems Items
-	dec := xml.NewDecoder(os.Stdin)
-	for {
-		tok, err := dec.Token()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
-			os.Exit(1)
-		}
-		switch tok := tok.(type) {
-		case xml.StartElement:
-			if tok.Name.Local == "item" {
-				// "this" has to be inside since timespent can be missing
-				// and when it is it gets it's value from last iteration
-				var this Item
-				dec.DecodeElement(&this, &tok)
-				allItems = append(allItems, this)
-			}
-		}
+	cfg := loadConfig()
+	flag.Parse()
+	c := appContext{
+		trace: *trace,
+		cfg:   cfg,
 	}
+
+	if *jiraSearchID == "" || *fbProject == "" || *fbTask == "" {
+		c.helpFB()
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	var err error
+	url := fmt.Sprintf("https://%s.atlassian.net/sr/jira.issueviews:searchrequest-xml/%s/SearchRequest-%s.xml?tempMax=1000&field=key&field=summary&field=timespent&field=due&os_authType=basic", c.cfg.JiraAccountName, *jiraSearchID, *jiraSearchID)
+	x, err := c.downloadItems(url)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
+		os.Exit(1)
+	}
+	allItems := parseXML(x)
+
 	// fmt.Printf("%#v", allItems)
-	for _, v := range allItems {
-		//                    Mon, 4 Apr 2016 00:00:00 -0700
-		d, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
+	for i, v := range allItems {
+		//                                     Mon, 4 Apr 2016 00:00:00 -0700
+		allItems[i].DueDate, err = time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
 			os.Exit(1)
 		}
 		// %-67s - pads Summary to 67 chars
-		fmt.Printf("%s\t%v\t%-67s%8.2f\n", v.Key.Val, d.Format("2006-JAN-02"), v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+		fmt.Printf("%s\t%v\t%s: %-67s%8.2f\n", v.Key.Val, allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+	}
+
+	fb := NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
+	c.printFB(fb.Clients())
+	c.printFB(fb.Projects())
+	c.printFB(fb.Tasks())
+	c.printFB(fb.Users())
+	//fmt.Printf("%#v\n", fb)
+
+	for _, v := range allItems {
+		te := &TimeEntry{
+			ProjectID: fb.findProject(*fbProject),
+			TaskID:    fb.findTask(*fbTask),
+			UserID:    1,
+			Date:      v.DueDate.Format("2006-01-02"),
+			Notes:     fmt.Sprintf("%s: %s", v.Key.Val, v.Summary),
+			Hours:     float64(v.TimeSpent.Seconds) / 60 / 60,
+		}
+		id, err := fb.SaveTimeEntry(te)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Created Time Entry: ID:%d\n", id)
 	}
 
 }
