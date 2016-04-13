@@ -104,7 +104,7 @@ func (c *appContext) updateTrans(v Item, j *Jira) {
 	fmt.Printf("\tTransitioned ISSUE:%s to ID:%s\n", v.Key.Val, c.cfg.JiraInvoicedTransID)
 }
 
-func (c *appContext) updateLable(v Item, j *Jira, invoice string) {
+func (c *appContext) updateLabel(v Item, j *Jira, invoice string) {
 	r, err := j.IssuesService.Label(v.Key.Val, c.cfg.JiraInvoicedPrefix+invoice)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "j2i: Resp: %v\n", string(r))
@@ -129,6 +129,6 @@ func (c *appContext) updateItems(allItems Items) {
 
 	for _, v := range allItems {
 		c.updateTrans(v, j)
-		c.updateLable(v, j, invoice)
+		c.updateLabel(v, j, invoice)
 	}
 }
