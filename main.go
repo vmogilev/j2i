@@ -18,6 +18,7 @@ var (
 	fbProject    = flag.String("fbProject", "", "Fresh Books Project Name")
 	fbTask       = flag.String("fbTask", "", "Fresh Books Task")
 	doFB         = flag.Bool("doFB", true, "Do a push to FreshBooks")
+	doJIRA       = flag.Bool("doJIRA", true, "Do an update back to JIRA")
 	trace        = flag.Bool("trace", false, "Trace flag")
 )
 
@@ -36,9 +37,10 @@ type appConfig struct {
 }
 
 type appContext struct {
-	trace bool
-	doFB  bool
-	cfg   *appConfig
+	trace  bool
+	doFB   bool
+	doJIRA bool
+	cfg    *appConfig
 }
 
 var c *appContext
@@ -96,9 +98,10 @@ func main() {
 	cfg := loadConfig()
 	flag.Parse()
 	c = &appContext{
-		trace: *trace,
-		doFB:  *doFB,
-		cfg:   cfg,
+		trace:  *trace,
+		doFB:   *doFB,
+		doJIRA: *doJIRA,
+		cfg:    cfg,
 	}
 
 	if *jiraSearchID == "" || *fbProject == "" || *fbTask == "" {
@@ -125,7 +128,7 @@ func main() {
 			os.Exit(1)
 		}
 		// %-67s - pads Summary to 67 chars
-		fmt.Printf("%s\t%v\t%s: %-67s%8.2f\n", v.Key.Val, allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+		fmt.Printf("%s\t%v\t%s: %-70s%8.2f\n", v.Key.Val, allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
 	}
 
 	fb := NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
@@ -141,5 +144,10 @@ func main() {
 		fmt.Printf("<--- FreshBooks.End\n")
 	}
 
-	c.updateItems(allItems)
+	if c.doJIRA {
+		fmt.Printf("---> JIRA.Start\n")
+		c.updateItems(allItems)
+		fmt.Printf("<--- JIRA.End\n")
+	}
+
 }
