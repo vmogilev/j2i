@@ -17,27 +17,31 @@ var (
 	jiraSearchID = flag.String("jiraSearchID", "", "JIRA Search Filter ID, for example in ?filter=10101, it's 10101")
 	fbProject    = flag.String("fbProject", "", "Fresh Books Project Name")
 	fbTask       = flag.String("fbTask", "", "Fresh Books Task")
-	trace        = flag.Bool("trace", false, "Trace")
+	doFB         = flag.Bool("doFB", true, "Do a push to FreshBooks")
+	trace        = flag.Bool("trace", false, "Trace flag")
 )
 
 type appConfig struct {
-	JiraAccountName    string // JIRA account name (i.e. hashjoin - appended to .atlassian.net XML feed for items)
-	JiraUname          string // JIRA Username (i.e. admin, not email address)
-	JiraPass           string // JIRA password
-	FbAccountName      string
-	FbAuthToken        string // Token-Based authentication (deprecated)
-	FbConsumerKey      string // OAuth authentication
-	FbConsumerSecret   string // OAuth authentication
-	FbOAuthToken       string // OAuth authentication
-	FbOAuthTokenSecret string // OAuth authentication
+	JiraAccountName     string // Account name (i.e. hashjoin - appended to .atlassian.net XML feed for items)
+	JiraUname           string // Username (i.e. admin, not email address)
+	JiraPass            string // Password
+	JiraInvoicedTransID string // Transition ID set on invoiced issues (for example Done=11 on our JIRA Cloud Instance)
+	JiraInvoicedPrefix  string // Invoiced issues are labled with JiraInvoicedPrefix+FB-Invoice#
+	FbAccountName       string
+	FbAuthToken         string // Token-Based authentication (deprecated)
+	FbConsumerKey       string // OAuth authentication
+	FbConsumerSecret    string // OAuth authentication
+	FbOAuthToken        string // OAuth authentication
+	FbOAuthTokenSecret  string // OAuth authentication
 }
 
 type appContext struct {
 	trace bool
+	doFB  bool
 	cfg   *appConfig
 }
 
-var c appContext
+var c *appContext
 
 func loadConfig() *appConfig {
 	usr, err := user.Current()
@@ -75,23 +79,25 @@ func (c *appContext) helpFB() {
 	c.printFB(fb.Projects())
 	c.printFB(fb.Tasks())
 
-	fmt.Println("--- Clients ---")
+	fmt.Printf("\n--- Clients ---\n")
 	for _, cl := range fb.clients {
 		fmt.Printf("%s\n", cl.Name)
 		fb.clientProjects(cl.ClientID)
 	}
-	fmt.Println("--- Tasks ---")
+	fmt.Printf("\n--- Tasks ---\n")
 	for _, tk := range fb.tasks {
-		fmt.Printf("\t%s\n", tk.Name)
+		fmt.Printf("%s\n", tk.Name)
 	}
+	fmt.Printf("\n")
 
 }
 
 func main() {
 	cfg := loadConfig()
 	flag.Parse()
-	c := appContext{
+	c = &appContext{
 		trace: *trace,
+		doFB:  *doFB,
 		cfg:   cfg,
 	}
 
@@ -129,21 +135,11 @@ func main() {
 	c.printFB(fb.Users())
 	//fmt.Printf("%#v\n", fb)
 
-	for _, v := range allItems {
-		te := &TimeEntry{
-			ProjectID: fb.findProject(*fbProject),
-			TaskID:    fb.findTask(*fbTask),
-			UserID:    1,
-			Date:      v.DueDate.Format("2006-01-02"),
-			Notes:     fmt.Sprintf("%s: %s", v.Key.Val, v.Summary),
-			Hours:     float64(v.TimeSpent.Seconds) / 60 / 60,
-		}
-		id, err := fb.SaveTimeEntry(te)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("Created Time Entry: ID:%d\n", id)
+	if c.doFB {
+		fmt.Printf("---> FreshBooks.Start\n")
+		fb.pushFB(allItems, *fbProject, *fbTask)
+		fmt.Printf("<--- FreshBooks.End\n")
 	}
 
+	c.updateItems(allItems)
 }

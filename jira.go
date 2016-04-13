@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/xml"
 	"errors"
@@ -57,7 +58,9 @@ func (c *appContext) downloadItems(u string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(result))
+	if c.trace {
+		fmt.Println(string(result))
+	}
 	return result, nil
 
 }
@@ -86,4 +89,46 @@ func parseXML(x []byte) Items {
 		}
 	}
 	return allItems
+}
+
+func (c *appContext) updateTrans(v Item, j *Jira) {
+	r, err := j.IssuesService.Transition(v.Key.Val, c.cfg.JiraInvoicedTransID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "j2i: Resp: %v\n", string(r))
+		fmt.Fprintf(os.Stderr, "j2i: Error: %v\n", err)
+		os.Exit(1)
+	}
+	if c.trace {
+		fmt.Printf("%v\n", string(r))
+	}
+	fmt.Printf("\tTransitioned ISSUE:%s to ID:%s\n", v.Key.Val, c.cfg.JiraInvoicedTransID)
+}
+
+func (c *appContext) updateLable(v Item, j *Jira, invoice string) {
+	r, err := j.IssuesService.Label(v.Key.Val, c.cfg.JiraInvoicedPrefix+invoice)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "j2i: Resp: %v\n", string(r))
+		fmt.Fprintf(os.Stderr, "j2i: Error: %v\n", err)
+		os.Exit(1)
+	}
+	if c.trace {
+		fmt.Printf("%v\n", string(r))
+	}
+	fmt.Printf("\tLabeled ISSUE:%s as %s\n", v.Key.Val, c.cfg.JiraInvoicedPrefix+invoice)
+
+}
+
+func (c *appContext) updateItems(allItems Items) {
+	url := fmt.Sprintf("https://%s.atlassian.net", c.cfg.JiraAccountName)
+	j := NewJiraClient(url, c.cfg.JiraUname, c.cfg.JiraPass, 1500)
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("\n\nGo to FreshBooks and create invoice, then come back here and enter Invoice#: ")
+	invoice, _ := reader.ReadString('\n')
+	fmt.Printf("Setting Invoice to: %s", invoice)
+
+	for _, v := range allItems {
+		c.updateTrans(v, j)
+		c.updateLable(v, j, invoice)
+	}
 }
