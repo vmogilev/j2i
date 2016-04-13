@@ -131,14 +131,14 @@ func main() {
 		fmt.Printf("%s\t%v\t%s: %-70s%8.2f\n", v.Key.Val, allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
 	}
 
-	fb := NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
-	c.printFB(fb.Clients())
-	c.printFB(fb.Projects())
-	c.printFB(fb.Tasks())
-	c.printFB(fb.Users())
-	//fmt.Printf("%#v\n", fb)
-
 	if c.doFB {
+		fb := NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
+		c.printFB(fb.Clients())
+		c.printFB(fb.Projects())
+		c.printFB(fb.Tasks())
+		c.printFB(fb.Users())
+		//fmt.Printf("%#v\n", fb)
+
 		fmt.Printf("---> FreshBooks.Start\n")
 		fb.pushFB(allItems, *fbProject, *fbTask)
 		fmt.Printf("<--- FreshBooks.End\n")
