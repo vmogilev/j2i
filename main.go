@@ -14,20 +14,22 @@ import (
 )
 
 var (
-	jiraSearchID = flag.String("jiraSearchID", "", "JIRA Search Filter ID, for example in ?filter=10101, it's 10101")
-	fbProject    = flag.String("fbProject", "", "Fresh Books Project Name")
-	fbTask       = flag.String("fbTask", "", "Fresh Books Task")
-	doFB         = flag.Bool("doFB", true, "Do a push to FreshBooks")
-	doJIRA       = flag.Bool("doJIRA", true, "Do an update back to JIRA")
-	trace        = flag.Bool("trace", false, "Trace flag")
+	client     = flag.String("client", "", "Client CODE from ~/.j2i/config.json - maps to JIRA Search Filter ID")
+	fbProject  = flag.String("fbProject", "", "Fresh Books Project Name")
+	fbTask     = flag.String("fbTask", "", "Fresh Books Task")
+	doFB       = flag.Bool("doFB", true, "Do a push to FreshBooks")
+	doJIRA     = flag.Bool("doJIRA", true, "Do an update back to JIRA")
+	reportOnly = flag.Bool("reportOnly", false, "Only Report JIRA Issues, don't push FB")
+	trace      = flag.Bool("trace", false, "Trace flag")
 )
 
 type appConfig struct {
-	JiraAccountName     string // Account name (i.e. hashjoin - appended to .atlassian.net XML feed for items)
-	JiraUname           string // Username (i.e. admin, not email address)
-	JiraPass            string // Password
-	JiraInvoicedTransID string // Transition ID set on invoiced issues (for example Done=11 on our JIRA Cloud Instance)
-	JiraInvoicedPrefix  string // Invoiced issues are labled with JiraInvoicedPrefix+FB-Invoice#
+	JiraAccountName     string            // Account name (i.e. hashjoin - appended to .atlassian.net XML feed for items)
+	JiraUname           string            // Username (i.e. admin, not email address)
+	JiraPass            string            // Password
+	JiraInvoicedTransID string            // Transition ID set on invoiced issues (for example Done=11 on our JIRA Cloud Instance)
+	JiraInvoicedPrefix  string            // Invoiced issues are labled with JiraInvoicedPrefix+FB-Invoice#
+	ClientSearchIDs     map[string]string // Client Code to JIRA Search Filter ID mapping
 	FbAccountName       string
 	FbAuthToken         string // Token-Based authentication (deprecated)
 	FbConsumerKey       string // OAuth authentication
@@ -37,10 +39,11 @@ type appConfig struct {
 }
 
 type appContext struct {
-	trace  bool
-	doFB   bool
-	doJIRA bool
-	cfg    *appConfig
+	trace      bool
+	doFB       bool
+	doJIRA     bool
+	reportOnly bool
+	cfg        *appConfig
 }
 
 var c *appContext
@@ -98,20 +101,21 @@ func main() {
 	cfg := loadConfig()
 	flag.Parse()
 	c = &appContext{
-		trace:  *trace,
-		doFB:   *doFB,
-		doJIRA: *doJIRA,
-		cfg:    cfg,
+		trace:      *trace,
+		doFB:       *doFB,
+		doJIRA:     *doJIRA,
+		reportOnly: *reportOnly,
+		cfg:        cfg,
 	}
 
-	if *jiraSearchID == "" || *fbProject == "" || *fbTask == "" {
+	if (!*reportOnly && (*fbProject == "" || *fbTask == "")) || *client == "" {
 		c.helpFB()
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	var err error
-	url := fmt.Sprintf("https://%s.atlassian.net/sr/jira.issueviews:searchrequest-xml/%s/SearchRequest-%s.xml?tempMax=1000&field=key&field=summary&field=timespent&field=due&os_authType=basic", c.cfg.JiraAccountName, *jiraSearchID, *jiraSearchID)
+	url := fmt.Sprintf("https://%s.atlassian.net/sr/jira.issueviews:searchrequest-xml/%s/SearchRequest-%s.xml?tempMax=1000&field=key&field=summary&field=timespent&field=due&os_authType=basic", c.cfg.JiraAccountName, c.cfg.ClientSearchIDs[*client], c.cfg.ClientSearchIDs[*client])
 	x, err := c.downloadItems(url)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
@@ -129,6 +133,10 @@ func main() {
 		}
 		// %-67s - pads Summary to 67 chars
 		fmt.Printf("%s\t%v\t%s: %-70s%8.2f\n", v.Key.Val, allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+	}
+
+	if c.reportOnly {
+		os.Exit(0)
 	}
 
 	if c.doFB {
