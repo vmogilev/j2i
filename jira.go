@@ -126,9 +126,9 @@ func (c *appContext) updateItems(allItems Items, a *API) {
 	j := NewJiraClient(url, c.cfg.JiraUname, c.cfg.JiraPass, 1500)
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\n\nGo to FreshBooks and create invoice, then come back here and enter Invoice#: ")
+	fmt.Print("\n\tThe above entries were uploaded to FreshBooks,\n\tcreate an invoice and enter it's number below\n\n\tInvoice Num: ")
 	invoice, _ := reader.ReadString('\n')
-	fmt.Printf("Setting Invoice to: %s", invoice)
+	fmt.Printf("\tSetting Invoice to: %s\n", invoice)
 
 	// need to trim \n! - it gets translated to &#xA; in XML call to FB!
 	invoice = strings.TrimSpace(invoice)
@@ -139,7 +139,17 @@ func (c *appContext) updateItems(allItems Items, a *API) {
 		os.Exit(1)
 	}
 
-	a.invoicePDF(invoice, filepath.Join(usr.HomeDir, "Desktop", "Invoice_"+invoice+".pdf"))
+	a.invoicePDF(invoice, filepath.Join(usr.HomeDir, "Desktop", "Invoice_"+c.client+"-"+invoice+".pdf"))
+
+	fmt.Print("\n\tIf everythins looks good enter \"y\" at the prompt below\n\tthis will update JIRA with Invoice# and close these Issues\n\n")
+	for {
+		fmt.Print("\tReady? [y|n]: ")
+		ready, _ := reader.ReadString('\n')
+		if strings.HasPrefix(strings.ToLower(ready), "y") {
+			break
+		}
+
+	}
 
 	for _, v := range allItems {
 		c.updateTrans(v, j)

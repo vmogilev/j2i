@@ -18,6 +18,15 @@ func (a *API) findProject(name string) int {
 	return 0
 }
 
+func (a *API) findTaskRate(name string) float64 {
+	for _, v := range a.tasks {
+		if v.Name == name {
+			return v.Rate
+		}
+	}
+	return 0
+}
+
 func (a *API) findTask(name string) int {
 	for _, v := range a.tasks {
 		if v.Name == name {
@@ -56,8 +65,21 @@ func (a *API) pushFB(allItems Items, fbProject string, fbTask string) {
 }
 
 func (a *API) invoiceByNum(invNumber string) (Invoice, error) {
-	request := &InvoiceByNumRequest{Method: "invoice.list", Page: 1, PerPage: a.perPage, Number: invNumber}
-	result, err := a.makeRequest(request)
+
+	req := struct {
+		XMLName xml.Name `xml:"request"`
+		Method  string   `xml:"method,attr"`
+		PerPage int      `xml:"per_page"`
+		Page    int      `xml:"page"`
+		Number  string   `xml:"number"`
+	}{
+		Method:  "invoice.list",
+		Page:    1,
+		PerPage: a.perPage,
+		Number:  invNumber,
+	}
+
+	result, err := a.makeRequest(&req)
 	if err != nil {
 		return Invoice{}, err
 	}
@@ -73,7 +95,12 @@ func (a *API) invoiceByNum(invNumber string) (Invoice, error) {
 		fmt.Printf("makeRequest: %#v\n", parsedInto)
 	}
 
-	return parsedInto.Invoices.Invoices[0], nil
+	if len(parsedInto.Invoices.Invoices) > 0 {
+		return parsedInto.Invoices.Invoices[0], nil
+	}
+
+	return Invoice{}, errors.New("Invoice Number: " + invNumber + " can't be located")
+
 }
 
 func (a *API) invoicePDF(invNumber string, saveTo string) error {
@@ -84,29 +111,31 @@ func (a *API) invoicePDF(invNumber string, saveTo string) error {
 		os.Exit(1)
 	}
 
-	fmt.Printf("%-15s: %d\n", "ID", inv.InvoiceID)
-	fmt.Printf("%-15s: %s\n", "Number", inv.Number)
-	fmt.Printf("%-15s: %s\n", "Date", inv.Date)
-	fmt.Printf("%-15s: %s\n", "PO", inv.PONumber)
-	fmt.Printf("%-15s: %8.2f\n", "Amount", inv.Amount)
+	fmt.Printf("\t%-15s: %d\n", "ID", inv.InvoiceID)
+	fmt.Printf("\t%-15s: %s\n", "Number", inv.Number)
+	fmt.Printf("\t%-15s: %s\n", "Date", inv.Date)
+	fmt.Printf("\t%-15s: %s\n", "PO", inv.PONumber)
+	fmt.Printf("\t%-15s: %.2f\n", "Amount", inv.Amount)
 
-	fmt.Printf("Downloading Invoice PDF to: %s\n", saveTo)
-	request := &InvoicePDFRequest{Method: "invoice.getPDF", InvoiceID: inv.InvoiceID}
-	result, err := a.makeRequest(request)
+	fmt.Printf("\tDownloading Invoice PDF to: %s\n", saveTo)
+	req := struct {
+		XMLName   xml.Name `xml:"request"`
+		Method    string   `xml:"method,attr"`
+		InvoiceID int      `xml:"invoice_id"`
+	}{
+		Method:    "invoice.getPDF",
+		InvoiceID: inv.InvoiceID,
+	}
+
+	result, err := a.makeRequest(&req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
 		os.Exit(1)
 	}
 
-	// data := &bytes.Buffer{}
-	// if err = xml.Unmarshal(*result, data); err != nil {
-	// 	fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
-	// 	os.Exit(1)
-	// }
-
 	dst, err := os.OpenFile(saveTo, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
+		fmt.Fprintf(os.Stderr, "j2i: can't save invoice! %v\n", err)
 		os.Exit(1)
 	}
 	defer dst.Close()

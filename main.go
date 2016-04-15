@@ -37,6 +37,7 @@ type appConfig struct {
 }
 
 type appContext struct {
+	client     string
 	trace      bool
 	doFB       bool
 	doJIRA     bool
@@ -100,6 +101,7 @@ func main() {
 	cfg := loadConfig()
 	flag.Parse()
 	c = &appContext{
+		client: *client,
 		trace:  *trace,
 		doFB:   *doFB,
 		doJIRA: *doJIRA,
@@ -127,6 +129,7 @@ func main() {
 	allItems := parseXML(x)
 
 	// fmt.Printf("%#v", allItems)
+	var totTime float64
 	for i, v := range allItems {
 		//                                     Mon, 4 Apr 2016 00:00:00 -0700
 		allItems[i].DueDate, err = time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
@@ -134,9 +137,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
 			os.Exit(1)
 		}
-		// %-67s - pads Summary to 67 chars
-		fmt.Printf("%s\t%v\t%s: %-70s%8.2f\n", v.Key.Val, allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+		// %-70s - pads Summary to 70 chars
+		fmt.Printf("%v   %s: %-70s%.2f\n", allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+		totTime += float64(v.TimeSpent.Seconds) / 60 / 60
 	}
+	fmt.Printf("%96s\n", "-----")
+	fmt.Printf("%89s: %.2f\n", "Total Hours", totTime)
 
 	if c.reportOnly {
 		os.Exit(0)
@@ -144,12 +150,14 @@ func main() {
 
 	var fb *API
 	fb = NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
+
 	if c.doFB {
 		c.printFB(fb.Clients())
 		c.printFB(fb.Projects())
 		c.printFB(fb.Tasks())
 		c.printFB(fb.Users())
-		//fmt.Printf("%#v\n", fb)
+
+		fmt.Printf("\n%87s: %.2f\n", "Task Total", totTime*fb.findTaskRate(*fbTask))
 
 		fmt.Printf("---> FreshBooks.Start\n")
 		fb.pushFB(allItems, *fbProject, *fbTask)

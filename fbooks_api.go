@@ -32,20 +32,6 @@ type (
 		PerPage int      `xml:"per_page"`
 		Page    int      `xml:"page"`
 	}
-	// InvoiceByNumRequest - time entry specific
-	InvoiceByNumRequest struct {
-		XMLName xml.Name `xml:"request"`
-		Method  string   `xml:"method,attr"`
-		PerPage int      `xml:"per_page"`
-		Page    int      `xml:"page"`
-		Number  string   `xml:"number"`
-	}
-	// InvoicePDFRequest - time entry specific
-	InvoicePDFRequest struct {
-		XMLName   xml.Name `xml:"request"`
-		Method    string   `xml:"method,attr"`
-		InvoiceID int      `xml:"invoice_id"`
-	}
 	// TimeEntryRequest - time entry specific
 	TimeEntryRequest struct {
 		XMLName   xml.Name  `xml:"request"`
@@ -115,8 +101,9 @@ type (
 	}
 	// Task - specific task
 	Task struct {
-		TaskID int    `xml:"task_id"`
-		Name   string `xml:"name"`
+		TaskID int     `xml:"task_id"`
+		Name   string  `xml:"name"`
+		Rate   float64 `xml:"rate"`
 	}
 	// User - specific user
 	User struct {
