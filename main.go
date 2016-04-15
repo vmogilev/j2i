@@ -14,13 +14,12 @@ import (
 )
 
 var (
-	client     = flag.String("client", "", "Client CODE from ~/.j2i/config.json - maps to JIRA Search Filter ID")
-	fbProject  = flag.String("fbProject", "", "Fresh Books Project Name")
-	fbTask     = flag.String("fbTask", "", "Fresh Books Task")
-	doFB       = flag.Bool("doFB", true, "Do a push to FreshBooks")
-	doJIRA     = flag.Bool("doJIRA", true, "Do an update back to JIRA")
-	reportOnly = flag.Bool("reportOnly", false, "Only Report JIRA Issues, don't push FB")
-	trace      = flag.Bool("trace", false, "Trace flag")
+	client    = flag.String("client", "", "Client CODE from ~/.j2i/config.json - maps to JIRA Search Filter ID")
+	fbProject = flag.String("fbProject", "", "Fresh Books Project Name")
+	fbTask    = flag.String("fbTask", "", "Fresh Books Task")
+	doFB      = flag.Bool("doFB", true, "Do a push to FreshBooks")
+	doJIRA    = flag.Bool("doJIRA", true, "Do an update back to JIRA")
+	trace     = flag.Bool("trace", false, "Trace flag")
 )
 
 type appConfig struct {
@@ -101,15 +100,19 @@ func main() {
 	cfg := loadConfig()
 	flag.Parse()
 	c = &appContext{
-		trace:      *trace,
-		doFB:       *doFB,
-		doJIRA:     *doJIRA,
-		reportOnly: *reportOnly,
-		cfg:        cfg,
+		trace:  *trace,
+		doFB:   *doFB,
+		doJIRA: *doJIRA,
+		cfg:    cfg,
 	}
 
-	if (!*reportOnly && (*fbProject == "" || *fbTask == "")) || *client == "" {
+	if *fbProject == "" || *fbTask == "" {
+		c.reportOnly = true
+	}
+
+	if *client == "" {
 		c.helpFB()
+		fmt.Printf("If you only want to see JIRA report - omit fbProject or fbTask or both\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
