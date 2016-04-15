@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -50,7 +49,8 @@ var c *appContext
 func loadConfig() *appConfig {
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
+		os.Exit(1)
 	}
 
 	cfgFile := filepath.Join(usr.HomeDir, ".j2i/config.json")
@@ -142,8 +142,9 @@ func main() {
 		os.Exit(0)
 	}
 
+	var fb *API
+	fb = NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
 	if c.doFB {
-		fb := NewAPI(c.cfg.FbAccountName, c.cfg.FbAuthToken)
 		c.printFB(fb.Clients())
 		c.printFB(fb.Projects())
 		c.printFB(fb.Tasks())
@@ -156,9 +157,7 @@ func main() {
 	}
 
 	if c.doJIRA {
-		fmt.Printf("---> JIRA.Start\n")
-		c.updateItems(allItems)
-		fmt.Printf("<--- JIRA.End\n")
+		c.updateItems(allItems, fb)
 	}
 
 }

@@ -32,6 +32,20 @@ type (
 		PerPage int      `xml:"per_page"`
 		Page    int      `xml:"page"`
 	}
+	// InvoiceByNumRequest - time entry specific
+	InvoiceByNumRequest struct {
+		XMLName xml.Name `xml:"request"`
+		Method  string   `xml:"method,attr"`
+		PerPage int      `xml:"per_page"`
+		Page    int      `xml:"page"`
+		Number  string   `xml:"number"`
+	}
+	// InvoicePDFRequest - time entry specific
+	InvoicePDFRequest struct {
+		XMLName   xml.Name `xml:"request"`
+		Method    string   `xml:"method,attr"`
+		InvoiceID int      `xml:"invoice_id"`
+	}
 	// TimeEntryRequest - time entry specific
 	TimeEntryRequest struct {
 		XMLName   xml.Name  `xml:"request"`
@@ -45,6 +59,7 @@ type (
 		Projects ProjectList `xml:"projects"`
 		Tasks    TaskList    `xml:"tasks"`
 		Users    UserList    `xml:"staff_members"`
+		Invoices InvoiceList `xml:"invoices"`
 	}
 	// TimeEntryResponse - time entry specific
 	TimeEntryResponse struct {
@@ -80,6 +95,11 @@ type (
 		Pagination
 		Users []User `xml:"member"`
 	}
+	// InvoiceList - invoices
+	InvoiceList struct {
+		Pagination
+		Invoices []Invoice `xml:"invoice"`
+	}
 	// Client - specific client
 	Client struct {
 		ClientID int    `xml:"client_id"`
@@ -114,6 +134,14 @@ type (
 		Date        string  `xml:"date"`       // Required
 		Notes       string  `xml:"notes"`
 		Hours       float64 `xml:"hours"`
+	}
+	// Invoice - specific Invoice
+	Invoice struct {
+		InvoiceID int     `xml:"invoice_id"`
+		Number    string  `xml:"number"`
+		Date      string  `xml:"date"`
+		PONumber  string  `xml:"po_number"`
+		Amount    float64 `xml:"amount"`
 	}
 )
 
@@ -267,6 +295,11 @@ func (a *API) makeRequest(request interface{}) (*[]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if c.trace {
+		fmt.Printf("makeRequest: %v\n", string(xmlRequest))
+	}
+
 	req, err := http.NewRequest("POST", a.apiURL, bytes.NewBuffer(xmlRequest))
 	if err != nil {
 		return nil, err

@@ -10,6 +10,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -118,7 +121,7 @@ func (c *appContext) updateLabel(v Item, j *Jira, invoice string) {
 
 }
 
-func (c *appContext) updateItems(allItems Items) {
+func (c *appContext) updateItems(allItems Items, a *API) {
 	url := fmt.Sprintf("https://%s.atlassian.net", c.cfg.JiraAccountName)
 	j := NewJiraClient(url, c.cfg.JiraUname, c.cfg.JiraPass, 1500)
 
@@ -126,6 +129,17 @@ func (c *appContext) updateItems(allItems Items) {
 	fmt.Print("\n\nGo to FreshBooks and create invoice, then come back here and enter Invoice#: ")
 	invoice, _ := reader.ReadString('\n')
 	fmt.Printf("Setting Invoice to: %s", invoice)
+
+	// need to trim \n! - it gets translated to &#xA; in XML call to FB!
+	invoice = strings.TrimSpace(invoice)
+
+	usr, err := user.Current()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to get current user %s", err)
+		os.Exit(1)
+	}
+
+	a.invoicePDF(invoice, filepath.Join(usr.HomeDir, "Desktop", "Invoice_"+invoice+".pdf"))
 
 	for _, v := range allItems {
 		c.updateTrans(v, j)
