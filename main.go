@@ -133,16 +133,22 @@ func main() {
 	for i, v := range allItems {
 		//                                     Mon, 4 Apr 2016 00:00:00 -0700
 		allItems[i].DueDate, err = time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", v.Due)
+
+		if c.trace {
+			fmt.Printf("%#v\n", v.Due)
+			fmt.Printf("%#v\n", allItems[i].DueDate)
+		}
+
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "j2i: %v\n", err)
 			os.Exit(1)
 		}
 		// %-70s - pads Summary to 70 chars
-		fmt.Printf("%v   %s: %-70s%.2f\n", allItems[i].DueDate.Format("2006-JAN-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
+		fmt.Printf("%v   %s: %-70s%.2f\n", allItems[i].DueDate.Format("2006-Jan-02"), v.Key.Val, v.Summary, float64(v.TimeSpent.Seconds)/60/60)
 		totTime += float64(v.TimeSpent.Seconds) / 60 / 60
 	}
 	fmt.Printf("%96s\n", "-----")
-	fmt.Printf("%89s: %.2f\n", "Total Hours", totTime)
+	fmt.Printf("%90s: %.2f\n", "Total Hours", totTime)
 
 	if c.reportOnly {
 		os.Exit(0)
